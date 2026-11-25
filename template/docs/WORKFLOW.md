@@ -58,6 +58,8 @@ Other agents propose edits to the writer. Separate the task document's lifecycle
 
 Use [the communication guide](COMMUNICATION.md) for cross-session delivery, pending reports, routing and safe session identity checks. Send a message for an assignment, meaningful blocker, terminal outcome, consultation or user decision. Use native completion events to recover failures and capture progress when available. A completed model turn is only a completed task when the task's outcome and evidence support it. Receive routine notifications without model-generated acknowledgments, periodic pings or automatic retries. The agent should save any undelivered terminal outcome for later delivery.
 
+With [automatic Codex routing](COMMUNICATION.md#automatic-codex-delivery), Director records the authorized request against the approved plan, sends a `TASK` with that reference, and ends its turn. Orchestrator checks the reference, completes the approved work, updates the project records, and sends one `REPORT`. The queued report wakes an eligible Director session, which summarizes the result for the user and ends its turn.
+
 Escalate blockers through the immediate parent. The Planner and Orchestrator can consult the Supervisor for a difficult technical decision. The Director asks the user for any decision that changes agreed project scope, technologies, risk or spending. Resolve small implementation choices within the approved plan.
 
 ## Checkpoint and rotation

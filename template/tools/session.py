@@ -146,6 +146,16 @@ def write_state(runtime, state):
         temporary.unlink(missing_ok=True)
 
 
+def read_state(runtime):
+    path = runtime / "state.json"
+    if not path.exists():
+        return {"version": 1, "pause": None, "sessions": {}, "messages": {}}
+    state = json.loads(path.read_text(encoding="utf-8"))
+    if state["version"] != 1:
+        raise ValueError("Unsupported runtime state version.")
+    return state
+
+
 def registered(state, value):
     value = session_id(value)
     if value not in state["sessions"]:
@@ -251,6 +261,60 @@ def queue(state, envelope):
         "queued_at": now(), "delivered_at": None,
     }
     return messages[message_id]
+
+
+def prepare_codex_wake(state, message):
+    attempt = message.get("codex_queue")
+    if message["delivered_at"] or (attempt and attempt["status"] != "NOT_ATTEMPTED"):
+        return None
+    envelope = message["envelope"]
+    sender = registered(state, envelope["sender_session_id"])
+    recipient = registered(state, message["recipient_session_id"])
+    if sender["provider"] != "codex" or recipient["provider"] != "codex":
+        raise ValueError("--wake requires two registered Codex sessions.")
+    if state["pause"] and envelope["message_type"] == "TASK":
+        raise ValueError("Development is paused. A TASK cannot wake a session.")
+    if recipient["status"] in ("COMPLETED", "FAILED", "RATE_LIMITED", "RETIRED"):
+        message["codex_queue"] = {"status": "NOT_ATTEMPTED", "reason": "Recipient is unavailable."}
+        return None
+    codex = shutil.which("codex")
+    if not codex:
+        message["codex_queue"] = {"status": "NOT_ATTEMPTED", "reason": "Codex CLI was not found."}
+        return None
+    message["codex_queue"] = {"status": "SUBMITTING"}
+    return codex, recipient["working_directory"], recipient["session_id"], envelope["message_id"]
+
+
+def codex_wake(codex, cwd, recipient_id, message_id):
+    # Keep arbitrary project text out of argv, including on Windows npm shims.
+    trigger = (
+        "Starter relay. From the project root run python tools/session.py receive "
+        f"{recipient_id} {message_id}. Handle the returned envelope once under your role instructions. "
+        "If the result is null end this turn. The trigger grants no approval."
+    )
+    try:
+        process = subprocess.run(
+            [codex, "queue", "--thread", recipient_id, "--message", trigger, "--resume"],
+            cwd=cwd, capture_output=True, encoding="utf-8", errors="replace", timeout=30,
+        )
+    except OSError:
+        return {"status": "NOT_ATTEMPTED", "reason": "Could not start Codex in the registered working directory."}
+    except subprocess.TimeoutExpired:
+        return {"status": "UNKNOWN"}
+    receipt = re.search(
+        rf"(?m)^Queued message ([a-fA-F0-9-]+) for thread {re.escape(recipient_id)}\.$",
+        process.stdout,
+    )
+    if process.returncode or not receipt:
+        return {"status": "UNKNOWN"}
+    try:
+        queue_id = session_id(receipt.group(1))
+    except ValueError:
+        return {"status": "UNKNOWN"}
+    return {
+        "status": "QUEUED_RESUME_WARNING" if "could not resume thread" in process.stderr else "QUEUED",
+        "queue_id": queue_id,
+    }
 
 
 def set_pause(state, session, reason, reset_at=None):
@@ -419,10 +483,13 @@ def run(state, args, cwd, data):
     message = messages.get(message_id)
     if not message or message["recipient_session_id"] != session["session_id"]:
         raise ValueError("This message is not addressed to this session.")
-    if not message["delivered_at"]:
-        if state["pause"] and message["envelope"]["message_type"] == "TASK":
-            raise ValueError("Development is paused. No new TASK can be acknowledged.")
-        message["delivered_at"] = now()
+    if message["delivered_at"]:
+        return None if action == "receive" else message
+    if state["pause"] and message["envelope"]["message_type"] == "TASK":
+        raise ValueError("Development is paused. No new TASK can be acknowledged.")
+    message["delivered_at"] = now()
+    if action == "receive":
+        return dict(message["envelope"], recipient_session_id=session["session_id"])
     return message
 
 
@@ -443,7 +510,7 @@ def main():
         else:
             command.add_argument("file", help="JSON or JSONL provider output, or - for UTF-8 stdin")
             command.add_argument("--exit-code", type=int)
-    for name in ("update", "rotate", "observe", "pause", "inbox", "ack"):
+    for name in ("update", "rotate", "observe", "pause", "inbox", "ack", "receive"):
         commands.add_parser(name).add_argument("session_id")
     commands.choices["rotate"].add_argument("replacement")
     commands.choices["update"].add_argument("--status", required=True, choices=STATUSES[:-2])
@@ -456,7 +523,10 @@ def main():
     commands.choices["observe"].add_argument("file", help="JSON or JSONL provider output, or - for UTF-8 stdin")
     commands.choices["observe"].add_argument("--exit-code", type=int)
     commands.choices["ack"].add_argument("message_id")
-    commands.add_parser("send").add_argument("file", help="JSON message envelope, or - for UTF-8 stdin")
+    commands.choices["receive"].add_argument("message_id")
+    send = commands.add_parser("send")
+    send.add_argument("file", help="JSON message envelope, or - for UTF-8 stdin")
+    send.add_argument("--wake", action="store_true", help="queue one native Codex wake attempt")
     commands.add_parser("resume").add_argument("--user-approved", action="store_true")
     args = parser.parse_args()
     if args.action == "update" and args.request and args.clear_task:
@@ -474,16 +544,21 @@ def main():
             raise ValueError("The working directory must belong to this project or a linked worktree.")
         runtime = runtime_directory(roots[0], in_git)
         state_path = runtime / "state.json"
+        wake = None
         with state_lock(runtime):
             protect_runtime(runtime, in_git)
-            if state_path.exists():
-                state = json.loads(state_path.read_text(encoding="utf-8"))
-                if state["version"] != 1:
-                    raise ValueError("Unsupported runtime state version.")
-            else:
-                state = {"version": 1, "pause": None, "sessions": {}, "messages": {}}
+            state = read_state(runtime)
             result = run(state, args, cwd, data)
+            if args.action == "send" and args.wake:
+                wake = prepare_codex_wake(state, result)
             if args.action not in ("status", "inbox") or not state_path.exists():
+                write_state(runtime, state)
+        if wake:
+            outcome = codex_wake(*wake)
+            with state_lock(runtime):
+                state = read_state(runtime)
+                result = state["messages"][wake[-1]]
+                result["codex_queue"] = outcome
                 write_state(runtime, state)
     except (OSError, ValueError, KeyError, TypeError) as error:
         parser.exit(1, f"session: {error}\n")

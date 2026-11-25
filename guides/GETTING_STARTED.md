@@ -31,6 +31,8 @@ You can use Codex for every role, Claude Code for every role, or assign a provid
 
 Tell Director what you want and how you will know it works. Ask it to record deferred ideas in the idea queue. Director can route a clear, scoped request directly and bring in Planner for initial architecture or larger changes. Approve a draft plan through Director before implementation starts. The Orchestrator records work in `tasks/INDEX.md` and reports verified outcomes through Director. Review changes locally and decide when to commit or push.
 
+For local Codex sessions, configure the [automatic TASK and REPORT path](../template/docs/COMMUNICATION.md#automatic-codex-delivery). Start the native daemon for saved idle targets and register the actual Director and Orchestrator thread IDs. On Windows, use the [verified Desktop setup](VERIFICATION.md#live-codex-workflow) with both sessions loaded and able to run the relay helper.
+
 ## Upgrade a customized installation
 
 Download the new version into a separate directory. Install into a scratch project, compare it with your working installation, and apply the changes you want. Running the installer again can add missing files, and preserves any existing files it encounters. Keep your current plan, task records, memory, and local runtime. Check the changelog and the session helper help before bringing any changed commands into a running project. [Changelog](../CHANGELOG.md)

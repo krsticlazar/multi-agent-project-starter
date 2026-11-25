@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -29,10 +30,10 @@ class SessionTests(unittest.TestCase):
         tools.mkdir(parents=True)
         shutil.copyfile(SOURCE, tools / "session.py")
 
-    def execute(self, *args, data=None, cwd=None, failure=None):
+    def execute(self, *args, data=None, cwd=None, failure=None, env=None):
         process = subprocess.run(
             [sys.executable, str(self.project / "tools" / "session.py"), *args],
-            cwd=cwd or self.project, input=data, capture_output=True, encoding="utf-8", check=False,
+            cwd=cwd or self.project, input=data, capture_output=True, encoding="utf-8", check=False, env=env,
         )
         if failure:
             self.assertNotEqual(process.returncode, 0)
@@ -120,6 +121,72 @@ class SessionTests(unittest.TestCase):
         self.assertIsNone(self.execute("status")["pause"])
         self.execute("pause", identifier, "--reason", "Confirmed subscription limit")
         self.assertEqual(self.execute("status")["sessions"][identifier]["status"], "RATE_LIMITED")
+
+    def test_codex_wake_and_receive_are_idempotent(self):
+        sender = self.register("codex", "orchestrator")
+        director = self.register("codex", "director")
+        native_queue = str(uuid4())
+        log = self.temp / "wake.log"
+        bin_dir = self.temp / "command bin"
+        bin_dir.mkdir()
+        if os.name == "nt":
+            cli = bin_dir / "codex.cmd"
+            cli.write_text(
+                '@echo off\necho %~5>>"%MAPS_TEST_WAKE_LOG%"\n'
+                'if "%MAPS_TEST_WAKE_UNKNOWN%"=="1" exit /b 1\n'
+                f'echo Queued message {native_queue} for thread %3.\n'
+                'echo Warning: message was queued, but could not resume thread %3. 1>&2\n',
+                encoding="ascii",
+            )
+        else:
+            cli = bin_dir / "codex"
+            cli.write_text(
+                '#!/bin/sh\nprintf "%s\\n" "$5" >> "$MAPS_TEST_WAKE_LOG"\n'
+                'if [ "$MAPS_TEST_WAKE_UNKNOWN" = 1 ]; then exit 1; fi\n'
+                f'printf "Queued message {native_queue} for thread %s.\\n" "$3"\n'
+                'echo "Warning: message was queued, but could not resume thread $3." >&2\n',
+                encoding="ascii",
+            )
+            cli.chmod(0o700)
+        env = {**os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"], "MAPS_TEST_WAKE_LOG": str(log)}
+        message_id = str(uuid4())
+        envelope = {
+            "message_id": message_id, "request_id": "REQ-001", "task_id": None,
+            "message_type": "REPORT", "sender_role": "orchestrator", "sender_session_id": sender,
+            "recipient_role": "director", "recipient_session_id": director, "payload": "Local report payload.",
+        }
+
+        def send(identifier):
+            data = json.dumps(dict(envelope, message_id=identifier))
+            return self.execute("send", "-", "--wake", data=data, env=env)
+
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(send, [message_id, message_id]))
+        self.assertIn({"status": "QUEUED_RESUME_WARNING", "queue_id": native_queue},
+                      [result["codex_queue"] for result in results])
+        self.assertEqual(send(str(uuid4()))["envelope"]["message_id"], message_id)
+        triggers = log.read_text().splitlines()
+        self.assertEqual(len(triggers), 1)
+        self.assertIn(message_id, triggers[0])
+        self.assertNotIn(envelope["payload"], triggers[0])
+        self.execute("receive", sender, message_id, failure="not addressed")
+        self.assertEqual(self.execute("receive", director, message_id), envelope)
+        self.assertIsNone(self.execute("receive", director, message_id))
+        self.assertEqual(self.execute("inbox", director), [])
+
+        unknown = dict(envelope, request_id="REQ-002", message_id=str(uuid4()))
+        result = self.execute("send", "-", "--wake", data=json.dumps(unknown),
+                              env={**env, "MAPS_TEST_WAKE_UNKNOWN": "1"})
+        self.assertEqual(result["codex_queue"]["status"], "UNKNOWN")
+        self.assertIsNone(result["delivered_at"])
+        self.assertEqual(self.execute("send", "-", "--wake", data=json.dumps(unknown), env=env), result)
+
+        pending_task = dict(envelope, message_id=str(uuid4()), message_type="TASK", request_id="REQ-003")
+        self.execute("send", "-", data=json.dumps(pending_task))
+        self.execute("pause", sender, "--reason", "Confirmed fixture quota event")
+        self.execute("send", "-", "--wake", data=json.dumps(pending_task), env=env, failure="paused")
+        self.execute("receive", director, pending_task["message_id"], failure="paused")
+        self.assertEqual(len(log.read_text().splitlines()), 2)
 
     def test_request_level_assignment_correlates_failure(self):
         director = self.register("codex", "director")

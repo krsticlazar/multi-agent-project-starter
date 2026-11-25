@@ -22,6 +22,8 @@ Confirm the client, account and workspace, project directory, and OS runtime. A 
 
 Check the assigned task and local runtime status. A terminal task report needs an explicit outcome and evidence. Keep the pending report and checkpoint, then send it only once when the destination becomes available. If a subscription limit triggered a pause, checkpoint ongoing work and wait for explicit approval before resuming. [Project workflow](../template/docs/WORKFLOW.md) · [Communication workflow](../template/docs/COMMUNICATION.md)
 
+For a Codex wake, verify the native daemon with `codex app-server daemon version` and check the exact thread's history. `QUEUED` proves acceptance by Codex. `delivered_at` in the local relay proves receipt of the envelope. When the target wakes but its shell cannot run `receive`, bring it back through a supported client with workspace access and recover the pending envelope by its existing ID. Repeated queue submission can create extra turns. [Automatic Codex delivery](../template/docs/COMMUNICATION.md#automatic-codex-delivery)
+
 ## Runtime state appears in `git status`
 
 Check `git ls-files -- .runtime` for tracked paths. For an ignored probe file, `git check-ignore -v -- .runtime/probe.txt` shows the matching rule. Keep `/.runtime/` in the root `.gitignore` or the runtime's internal ignore rule when setup uses one. If runtime files are already tracked, resolve that index state with the project owner before writing session data. Git ignore rules do not protect files already in the index.

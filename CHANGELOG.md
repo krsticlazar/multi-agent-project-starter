@@ -12,3 +12,4 @@ This project follows Semantic Versioning.
 - Local session and communication workflow with durable handoffs and a coordinated usage pause.
 - PowerShell and Bash installers that preserve existing project files, including hidden provider configuration.
 - Installation, model, plugin, troubleshooting, and contribution guides, plus checks for archive and installer behavior.
+- Native Codex wake for registered local sessions, with one submission per relay envelope and a one-time recipient receipt.

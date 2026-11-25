@@ -27,7 +27,7 @@ Ask in short groups and switch to the user's preferred language once known. Reus
 | `PROJECT.md` | Record the English project brief, known goals and constraints, user-facing language and open requirements. |
 | `MEMORY.md` | Record Bootstrap state and relevant references. Leave ongoing ownership to the Orchestrator. |
 | `PLAN.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` | Preserve application records already present. Leave the supplied empty sections for the Planner and Orchestrator on a new project. |
-| `docs/WORKFLOW.md` | Record approved changes to working conventions and delegation limits. |
+| `docs/WORKFLOW.md` | Record approved changes to working conventions and delegation limits. If the user chooses automatic Codex routing, record the verified local transport and limitations from the communication guide. |
 | `docs/MODELS.md` | Fill in the active profile, subscriptions, selected providers, model selectors and supported effort for each role. |
 | `docs/PLUGINS.md` | Record the selections and whether each is installed, unavailable or pending. Run only installation or setup actions authorized by the user and allowed by the provider. |
 | `tasks/INDEX.md`, `tasks/QUEUE.md` | Preserve project history. Leave data rows empty on a new project. |

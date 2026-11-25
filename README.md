@@ -44,7 +44,7 @@ The installer copies files from `template/`, including hidden provider directori
 3. **Orchestrator** coordinates approved work, maintains the task index and project memory, and consolidates reports. Research, Develop, and Review Bosses can coordinate scoped workers and native subagents when the work warrants them.
 4. **Supervisor** helps with hard decisions on demand. Director reports outcomes and asks for decisions that require your approval.
 
-The project documents carry progress across sessions. Agents use native delegation where available and a local handoff when a session is unavailable. On Windows, a Codex Desktop deep link opened the tested CLI session. Automatic listing and live updates need separate verification. On a usage limit, stop new project work, checkpoint the current changes, and wait for explicit approval to resume. See [the operational workflow](template/docs/WORKFLOW.md) and [session communication](template/docs/COMMUNICATION.md).
+The project documents carry progress across sessions. Local Codex agents can send a `TASK` or `REPORT` through the native queue to wake a registered session. The local relay preserves pending messages and records one recipient receipt. On a usage limit, stop new project work, checkpoint the current changes, and wait for explicit approval to resume. See [the operational workflow](template/docs/WORKFLOW.md) and [session communication](template/docs/COMMUNICATION.md).
 
 ## Project files
 
