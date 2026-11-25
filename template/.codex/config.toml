@@ -1,0 +1,3 @@
+# Model choices are recorded in docs/MODELS.md and supplied when starting work.
+[agents]
+max_threads = 3
