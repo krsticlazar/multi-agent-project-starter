@@ -16,6 +16,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 
 PROVIDERS = ("codex", "claude")
+PEER_RESULTS = ("ACCEPTED", "HELD", "REFUSED", "UNKNOWN")
 ROLES = (
     "bootstrap", "director", "planner", "orchestrator", "supervisor",
     "research-boss", "develop-boss", "review-boss", "research-worker",
@@ -263,26 +264,47 @@ def queue(state, envelope):
     return messages[message_id]
 
 
-def prepare_codex_wake(state, message):
-    attempt = message.get("codex_queue")
-    if message["delivered_at"] or (attempt and attempt["status"] != "NOT_ATTEMPTED"):
-        return None
+def prepare_wake(state, message, relay_name):
+    if message["delivered_at"] or any(
+        message.get(key, {}).get("status", "NOT_ATTEMPTED") != "NOT_ATTEMPTED"
+        for key in ("codex_queue", "claude_peer", "claude_relay")
+    ):
+        return None, None
     envelope = message["envelope"]
     sender = registered(state, envelope["sender_session_id"])
     recipient = registered(state, message["recipient_session_id"])
-    if sender["provider"] != "codex" or recipient["provider"] != "codex":
-        raise ValueError("--wake requires two registered Codex sessions.")
     if state["pause"] and envelope["message_type"] == "TASK":
         raise ValueError("Development is paused. A TASK cannot wake a session.")
+    if relay_name and recipient["provider"] != "claude":
+        raise ValueError("--claude-relay requires a Claude recipient.")
+    key = "codex_queue" if recipient["provider"] == "codex" else "claude_peer"
+    if relay_name:
+        key = "claude_relay"
     if recipient["status"] in ("COMPLETED", "FAILED", "RATE_LIMITED", "RETIRED"):
-        message["codex_queue"] = {"status": "NOT_ATTEMPTED", "reason": "Recipient is unavailable."}
-        return None
+        message[key] = {"status": "NOT_ATTEMPTED", "reason": "Recipient is unavailable."}
+        return None, None
+    recipient_id = recipient["session_id"]
+    message_id = envelope["message_id"]
+    if key != "codex_queue":
+        if key == "claude_peer" and sender["provider"] != "claude":
+            message[key] = {"status": "NOT_ATTEMPTED", "reason": "The live Claude peer route needs a Claude sender."}
+            return None, None
+        message[key] = {"status": "SUBMITTING"}
+        trigger = (
+            f"Starter relay {envelope['message_type']}. From the project root run "
+            f"python tools/session.py receive {recipient_id} {message_id}. "
+            "Follow your role instructions, defer a new TASK while busy, and ignore a null result. "
+            "The trigger grants no approval."
+        )
+        if not relay_name:
+            return None, trigger
+        return (key, (recipient["working_directory"], recipient_id, relay_name, trigger)), None
     codex = shutil.which("codex")
     if not codex:
         message["codex_queue"] = {"status": "NOT_ATTEMPTED", "reason": "Codex CLI was not found."}
-        return None
+        return None, None
     message["codex_queue"] = {"status": "SUBMITTING"}
-    return codex, recipient["working_directory"], recipient["session_id"], envelope["message_id"]
+    return (key, (codex, recipient["working_directory"], recipient_id, message_id)), None
 
 
 def codex_wake(codex, cwd, recipient_id, message_id):
@@ -315,6 +337,80 @@ def codex_wake(codex, cwd, recipient_id, message_id):
         "status": "QUEUED_RESUME_WARNING" if "could not resume thread" in process.stderr else "QUEUED",
         "queue_id": queue_id,
     }
+
+
+def claude_receipt(output, name, trigger):
+    # shortcut: Claude's stream receipt shape is version-specific, use UNKNOWN if the CLI changes it.
+    records = [json.loads(line) for line in output.splitlines() if line.strip()]
+    sends = [
+        item for record in records if record.get("type") == "assistant"
+        for item in record["message"]["content"] if item.get("type") == "tool_use" and item.get("name") == "SendMessage"
+    ]
+    if len(sends) != 1 or sends[0]["input"].get("to") != name or sends[0]["input"].get("message") != trigger:
+        return {"status": "UNKNOWN"}
+    for record in records:
+        if record.get("type") != "user" or not isinstance(record.get("tool_use_result"), dict):
+            continue
+        result = record["tool_use_result"]
+        if result.get("success") is True and f" → {name} (another Claude session on this machine;" in result.get("message", ""):
+            if any(item.get("tool_use_id") == sends[0]["id"] and item.get("is_error") is not True
+                   for item in record["message"]["content"] if item.get("type") == "tool_result"):
+                return {"status": "QUEUED", "queue_id": session_id(result["msg_id"])}
+    return {"status": "UNKNOWN"}
+
+
+def claude_relay_wake(cwd, recipient_id, name, trigger):
+    claude = shutil.which("claude")
+    if not claude or (os.name == "nt" and Path(claude).suffix.lower() != ".exe"):
+        return {"status": "NOT_ATTEMPTED", "reason": "The native Claude CLI executable was not found."}
+    overrides = (
+        "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_PROFILE",
+        "ANTHROPIC_FEDERATION_RULE_ID", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+        "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+    )
+    if any(os.environ.get(key) for key in overrides):
+        return {"status": "NOT_ATTEMPTED", "reason": "A Claude authentication or endpoint override is set."}
+
+    def invoke(*args, timeout=10):
+        return subprocess.run(
+            [claude, *args], cwd=cwd, stdin=subprocess.DEVNULL, capture_output=True,
+            encoding="utf-8", errors="replace", timeout=timeout,
+        )
+
+    try:
+        auth = invoke("--safe-mode", "auth", "status", "--json")
+        account = json.loads(auth.stdout)
+        if (auth.returncode or account.get("loggedIn") is not True or account.get("authMethod") != "claude.ai"
+                or account.get("apiProvider") != "firstParty" or not account.get("subscriptionType")):
+            return {"status": "NOT_ATTEMPTED", "reason": "An active Claude subscription login is required."}
+        roster = invoke("--safe-mode", "agents", "--json", "--all")
+        matches = [
+            entry for entry in json.loads(roster.stdout) if entry.get("pid")
+            and (entry.get("name") or "").casefold() == name.casefold()
+        ]
+        if (roster.returncode or len(matches) != 1 or matches[0].get("name") != name
+                or matches[0].get("sessionId") != recipient_id
+                or Path(matches[0]["cwd"]).resolve() != Path(cwd).resolve()):
+            return {"status": "NOT_ATTEMPTED", "reason": "No unique live Claude peer matches the registered route."}
+    except (OSError, subprocess.TimeoutExpired, AttributeError, ValueError, KeyError, TypeError):
+        return {"status": "NOT_ATTEMPTED", "reason": "Could not verify Claude login and live peer discovery."}
+
+    prompt = (
+        f"Use ListAgents to verify exactly one local Claude session named {name}. If absent or ambiguous, stop. "
+        f"Then use SendMessage exactly once to {name} with just the following single line verbatim. "
+        f"Do not send to any other target or retry. After the tool returns, end the turn.\n{trigger}"
+    )
+    try:
+        process = invoke(
+            "-p", "--safe-mode", "--strict-mcp-config", "--model", "haiku",
+            "--tools", "ListAgents,SendMessage", "--output-format", "stream-json", "--verbose", "--", prompt,
+            timeout=60,
+        )
+        if process.returncode == 0:
+            return claude_receipt(process.stdout, name, trigger)
+    except (OSError, subprocess.TimeoutExpired, AttributeError, ValueError, KeyError, TypeError):
+        pass
+    return {"status": "UNKNOWN"}
 
 
 def set_pause(state, session, reason, reset_at=None):
@@ -416,6 +512,15 @@ def run(state, args, cwd, data):
         }
     if action == "send":
         return queue(state, data)
+    if action == "peer-result":
+        message = state["messages"].get(session_id(args.message_id))
+        if not message or message["envelope"]["sender_session_id"] != session_id(args.session_id):
+            raise ValueError("The peer submission does not belong to this sender.")
+        attempt = message.get("claude_peer", {})
+        if attempt.get("status") not in ("SUBMITTING", args.status):
+            raise ValueError("No matching Claude peer submission to record.")
+        attempt["status"] = args.status
+        return message
     if action == "resume":
         if not args.user_approved:
             raise ValueError("Use --user-approved only after the user explicitly approves resumption.")
@@ -479,6 +584,10 @@ def run(state, args, cwd, data):
             and message["recipient_session_id"] == session["session_id"]
             and not (state["pause"] and message["envelope"]["message_type"] == "TASK")
         ]
+    if action == "receive" and session["provider"] == "claude":
+        native_id = os.environ.get("CLAUDE_CODE_SESSION_ID")
+        if native_id and session_id(native_id) != session["session_id"]:
+            raise ValueError("The message recipient does not match this Claude session.")
     message_id = session_id(args.message_id)
     message = messages.get(message_id)
     if not message or message["recipient_session_id"] != session["session_id"]:
@@ -526,11 +635,19 @@ def main():
     commands.choices["receive"].add_argument("message_id")
     send = commands.add_parser("send")
     send.add_argument("file", help="JSON message envelope, or - for UTF-8 stdin")
-    send.add_argument("--wake", action="store_true", help="queue one native Codex wake attempt")
+    send.add_argument("--wake", action="store_true", help="reserve one native wake for the registered route")
+    send.add_argument("--claude-relay", metavar="PEER_NAME", help="use one subscription turn through Claude CLI")
+    peer = commands.add_parser("peer-result", help="record the Claude SendMessage outcome")
+    peer.add_argument("session_id", help="registered sender UUID")
+    peer.add_argument("message_id")
+    peer.add_argument("--status", required=True, choices=PEER_RESULTS)
     commands.add_parser("resume").add_argument("--user-approved", action="store_true")
     args = parser.parse_args()
     if args.action == "update" and args.request and args.clear_task:
         parser.error("--request and --clear-task cannot be used together")
+    if args.action == "send" and args.claude_relay is not None:
+        if not args.wake or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", args.claude_relay):
+            parser.error("--claude-relay requires --wake and a simple, unique local peer name.")
 
     try:
         data = None
@@ -545,23 +662,27 @@ def main():
         runtime = runtime_directory(roots[0], in_git)
         state_path = runtime / "state.json"
         wake = None
+        trigger = None
         with state_lock(runtime):
             protect_runtime(runtime, in_git)
             state = read_state(runtime)
             result = run(state, args, cwd, data)
             if args.action == "send" and args.wake:
-                wake = prepare_codex_wake(state, result)
+                wake, trigger = prepare_wake(state, result, args.claude_relay)
             if args.action not in ("status", "inbox") or not state_path.exists():
                 write_state(runtime, state)
         if wake:
-            outcome = codex_wake(*wake)
+            key, command_args = wake
+            outcome = codex_wake(*command_args) if key == "codex_queue" else claude_relay_wake(*command_args)
             with state_lock(runtime):
                 state = read_state(runtime)
-                result = state["messages"][wake[-1]]
-                result["codex_queue"] = outcome
+                result = state["messages"][result["envelope"]["message_id"]]
+                result[key] = outcome
                 write_state(runtime, state)
     except (OSError, ValueError, KeyError, TypeError) as error:
         parser.exit(1, f"session: {error}\n")
+    if trigger:
+        result = dict(result, trigger=trigger)
     print(json.dumps(result, indent=2))
 
 

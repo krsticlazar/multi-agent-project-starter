@@ -8,7 +8,7 @@ Use OpenAI Codex, Claude Code, or both with your existing subscription access. A
 
 ## Quick start
 
-1. Get a source archive from the repository, extract it, and open a shell in the extracted directory. For a reproducible download, select a published `vX.Y.Z` tag or an implementation commit before using **Code → Download ZIP**. [GitHub source archives](https://docs.github.com/en/repositories/working-with-files/using-files/downloading-source-code-archives)
+1. Download the source ZIP, extract it, and open a shell in the extracted directory. Pin the download to a commit when you need a reproducible installation. [Download `main` as a ZIP](https://github.com/krsticlazar/multi-agent-project-starter/archive/refs/heads/main.zip) · [GitHub source archive URLs](https://docs.github.com/en/repositories/working-with-files/using-files/downloading-source-code-archives#source-code-archive-urls)
 2. Run the installer for your shell. Choose an existing directory or a new directory whose parent already exists.
 
    **Windows with PowerShell**
@@ -44,7 +44,7 @@ The installer copies files from `template/`, including hidden provider directori
 3. **Orchestrator** coordinates approved work, maintains the task index and project memory, and consolidates reports. Research, Develop, and Review Bosses can coordinate scoped workers and native subagents when the work warrants them.
 4. **Supervisor** helps with hard decisions on demand. Director reports outcomes and asks for decisions that require your approval.
 
-The project documents carry progress across sessions. Local Codex agents can send a `TASK` or `REPORT` through the native queue to wake a registered session. The local relay preserves pending messages and records one recipient receipt. On a usage limit, stop new project work, checkpoint the current changes, and wait for explicit approval to resume. See [the operational workflow](template/docs/WORKFLOW.md) and [session communication](template/docs/COMMUNICATION.md).
+The project documents carry progress across sessions. The local relay sends `TASK` and `REPORT` wakes through the Codex queue or Claude peer tools and supports an opt-in Claude CLI relay for mixed sessions. Pending envelopes stay available for recovery, with one recorded recipient receipt. On a confirmed usage limit, stop new project work, checkpoint the current changes, and wait for explicit approval to resume. See [the operational workflow](template/docs/WORKFLOW.md) and [session communication](template/docs/COMMUNICATION.md).
 
 ## Project files
 

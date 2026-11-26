@@ -4,16 +4,7 @@ Choose models you can select in the signed-in native client. Marketing names, mo
 
 ## Starting profiles
 
-| Role | Codex only | Claude Code only | Mixed |
-| --- | --- | --- | --- |
-| Bootstrap and Director | Sol, medium | Sonnet, medium | Sol, medium |
-| Planner | Strongest available, high | Opus, high | Opus, high |
-| Orchestrator | Sol, medium or high | Opus or Sonnet, medium or high | Sol or Opus, medium or high |
-| Supervisor | Strongest available, high | Fable or Opus, high | Fable or Opus, high |
-| Research Boss and worker | Sol or Luna, low or medium | Sonnet, low or medium | Sonnet or Luna, low or medium |
-| Develop Boss and worker | Sol, medium | Sonnet, medium | Sol, medium |
-| Review Boss and worker | Sol or Luna, medium | Sonnet, medium | Sol or Luna, medium |
-| Routine subagent | Luna, low or medium | Haiku or Sonnet, low or medium | A fast model on the assigned provider |
+Use the [role-by-role starting profiles](../template/docs/MODELS.md#starting-profiles) that Bootstrap reads in the installed project. Check availability in the client before saving the active profile.
 
 Use the simplest model and delegation path that can verify the result. A Claude Code Fable seat may show a usage credit requirement. Select an included model unless the project owner explicitly approves separate billing. The starter never reroutes a job to a different provider when a limit is hit. [Claude Code model availability and usage credits](https://code.claude.com/docs/en/model-config)
 

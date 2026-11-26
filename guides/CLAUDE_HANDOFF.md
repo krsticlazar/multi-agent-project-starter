@@ -1,22 +1,20 @@
-# Claude Code integration handoff
+# Claude Code and mixed-provider handoff
 
-Claude and mixed-provider live work is deferred until an authenticated Claude Code environment is available. This guide records the current interface and the remaining acceptance checks. Consult [verification](VERIFICATION.md) for observed results and [session communication](../template/docs/COMMUNICATION.md) for the operating procedure.
+This phase adds local Claude and mixed-provider routes to the existing Session Registry. The [communication guide](../template/docs/COMMUNICATION.md) describes provisioning, permissions, routing, and recovery. [Verification](VERIFICATION.md) records the Windows CLI transport check and the earlier Codex Desktop result.
 
-## Existing components
+## Prepare the project
 
-- The [Claude project directory](../template/.claude/) contains native agent definitions, settings, and a checkpoint skill adapter. [CLAUDE.md](../template/CLAUDE.md) imports the common agent rules. The project models guide describes how Bootstrap records provider and model choices.
-- The [session helper](../template/tools/session.py) maintains the Session Registry and relay in the primary checkout's ignored `.runtime/state.json`. Register interactive UUIDs with `register`, or use `capture claude ROLE FILE` with provider JSON or JSONL from `system/init` or `result`. Verify readiness before setting the registry status to `IDLE`. Keep provider IDs and work directories local.
-- `send FILE` persists a provider-independent envelope for a registered route. `inbox` reads pending messages. `receive RECIPIENT_UUID MESSAGE_UUID` acknowledges and returns the addressed envelope once. `ack` records verified manual delivery. Use `rotate` after checkpointing to transfer routing and pending envelopes. State updates use a file lock and an atomic replacement.
-- `observe` accepts a CLI outcome, a structured callback, or a native event with `observe auto -` if it exposes a supported session ID. It records qualifying failures and queues a local `BLOCKER`. The Claude parser handles failed `result` and `StopFailure`; a rate-limit indication needs subscription-specific confirmation before setting the shared pause. The helper includes no enabled hook of its own.
-- Automatic Codex routing uses an explicit `send FILE --wake` after a role checkpoints its `TASK` or `REPORT`. `codex queue --resume` receives a marker with the local message UUID. The destination calls `receive`. The persisted submission attempt prevents duplicate native sends. Queue acceptance, envelope receipt, and task completion each have their own evidence.
+1. Start the Director and Orchestrator in the project with their chosen providers and role briefs. Use normal permissions. Confirm each role can read and write the shared relay and record its actual UUID, working directory, parent route, and readiness. Keep one writer per provider session.
+2. Choose a route in each direction. Use `send FILE --wake` for a Codex target. For native Claude peers, use the reserved trigger with `SendMessage`. For a loaded, uniquely named Claude target reachable from the CLI, the owner can opt into `send FILE --wake --claude-relay PEER_NAME`. Record both choices in the role briefs before dispatch. The CLI relay uses an extra Claude subscription turn per wake.
+3. On Windows, load the Codex targets in Desktop if the separate native daemon cannot provision workspace execution. For Claude, confirm that the intended surface can see and address the target. When opening a saved CLI conversation in Claude Desktop, first close its previous writer. A missing peer or an unavailable permission leaves a recoverable local envelope.
+4. If using Claude's optional `StopFailure` hook, install it from the communication guide and verify that Claude can launch Python. Confirm a subscription limit in the provider before setting the coordinated pause. Resume after user approval.
 
-The Windows smoke verified the full Codex-only request and report round trip with both sessions loaded in Desktop and able to run the helper. A separate native daemon can wake a saved session. In the tested environment its background shell lacked workspace provisioning, so the helper preserved the pending task for recovery.
+## First real project check
 
-## Work to resume
+Use an approved project request after reviewing and approving an implementation checkpoint. The project owner conducts this check.
 
-1. Sign in through the official Claude client. Verify its version, availability of local peer messaging, background session capture, and eligible Desktop opening paths with small disposable chats.
-2. Verify Claude → Claude with local peer discovery and `SendMessage`, including idle activation, busy behavior, inbound controls, and one terminal report. Test Claude → Codex by calling the native Codex transport within an authorized Claude session and validating actual receipt.
-3. Verify Codex → Claude with a supported Claude-owned target or an explicitly inactive saved session. Keep the provider-neutral relay for recovery. Choose any additional automation only after verifying published transport, authentication, ownership, and delivery behavior on Windows.
-4. Run a mixed-provider Director and Orchestrator fixture. Confirm which Desktop client displays each turn, the live return report, duplicate suppression, and the shared pause. Preserve native permission settings and session ownership throughout.
+- Confirm the Director's `TASK` is persisted before the target wakes. Note native acceptance and verify that the Orchestrator receives the exact addressed envelope once.
+- Confirm the Orchestrator checkpoints its results, sends one `REPORT`, and the Director presents it in the expected conversation without an additional user prompt when both routes support delivery.
+- Verify that the expected history is visible in the selected Desktop app. Check the local envelope and task record before recovering an uncertain delivery. Use the original message UUID and verify the intended recipient before resuming or rotating.
 
-Keep credentials with their provider. The registry stores local routing and delivery evidence. For a newer provider adapter, preserve the existing envelope, retry discipline, and receipt semantics before extending the transport.
+The local Claude CLI smoke established discovery, inbox acceptance, and an idle target turn. Live Claude → Codex shell dispatch, busy Claude peers, the mixed project round trip, and Claude Desktop roster visibility remain acceptance checks. The public Claude inbox docs describe Windows authentication without a stable external message submission and acknowledgement contract. The project uses the official CLI and native tools for the opt-in route. [Claude peer messaging](https://code.claude.com/docs/en/cross-session-messaging) · [Claude Code Desktop](https://code.claude.com/docs/en/desktop#coming-from-the-cli)

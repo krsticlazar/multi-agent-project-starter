@@ -8,7 +8,9 @@ Start a fresh chat in the chosen provider and working directory. Use the role pr
 
 Codex can start a persistent CLI thread with `codex exec --json -` and a brief on stdin. The `thread.started` event contains `thread_id`. Add `--skip-git-repo-check` when the project has no Git repository. Set `--sandbox read-only` for an initial confirmation that needs no edits. Open a saved thread with `codex resume UUID` or run a single follow-up with `codex exec resume --json UUID -`. Use only one writer for a saved thread. See [Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode) and the [CLI reference](https://learn.chatgpt.com/docs/cli/reference).
 
-Claude Code can start with `claude --bg --name Director "Read the Director role and confirm readiness"` and show its actual background ID with `claude agents --json`. Use `claude attach UUID` for its live terminal view. Alternatively, use `claude -p --output-format stream-json --verbose "Read the Director role and confirm readiness"` and capture `session_id` from `system/init` or `result`. Use `claude --resume UUID` to open a saved inactive session. For authorized single-turn follow-up to an inactive session, use `claude -p --resume UUID --output-format json "MESSAGE"`. Confirm the documented authentication and billing behavior for the selected mode before a headless run. See [Claude CLI reference](https://code.claude.com/docs/en/cli-reference), [background sessions](https://code.claude.com/docs/en/agent-view) and [programmatic mode](https://code.claude.com/docs/en/headless).
+Start a Claude role in the Code tab or run `claude --name PROJECT-ROLE` from its working directory. Give it the role briefing and confirm that it can run `python tools/session.py status` with its normal permissions. Get the real UUID from `/status` or the full `sessionId` in `claude agents --json --all --cwd PROJECT_DIRECTORY`. If you choose `claude --bg`, use the short job `id` for `claude attach JOB_ID` and the full `sessionId` for `register`. Review native background worktree isolation and its Git behavior before using it for roles authorized to edit. A background worker can stop when idle. Keep the role loaded or pin it in agent view if it needs to receive messages. Use `claude -p --output-format stream-json --verbose` for a one-shot readiness check in a trusted project and use `capture` on its `system/init` or `result` record. Check which authentication is active before a headless run. See [Claude CLI reference](https://code.claude.com/docs/en/cli-reference), [background sessions](https://code.claude.com/docs/en/agent-view) and [programmatic mode](https://code.claude.com/docs/en/headless).
+
+For registration from within a standalone Claude session, the shell tool can pass `CLAUDE_CODE_SESSION_ID` directly as the ID to `register` when Claude exports it. On explicit resume, confirm it matches the expected UUID. `receive` checks this ID for a Claude target when the variable is available. See [Claude Code environment variables](https://code.claude.com/docs/en/env-vars).
 
 When starting a headless session, retain its provider output in a private local location only for as long as needed. Observe the process exit code and verify the expected readiness response. If neither automatic creation nor reliable ID capture is available, ask the user to open a new provider chat with the role brief. Record provisioning as pending until you can confirm readiness and see the real ID.
 
@@ -16,12 +18,12 @@ When starting a headless session, retain its provider output in a private local 
 
 | Sender → recipient | Native option | Delivery evidence |
 |---|---|---|
-| Codex → Codex | `python tools/session.py send FILE --wake` submits a wake through `codex queue --resume`. | The helper records the native queue receipt. The target calls `receive` to confirm receipt and deduplicate. |
-| Claude → Claude | Use native `ListAgents` and `SendMessage` where available. Select the registered project session. | Use the native delivery result and check that the target receives the message. A one-shot idle notice tracks session activity. |
-| Claude → Codex | Invoke the same authorized Codex CLI command from the shell, or use the optional Codex plugin for a scoped task. | Check the Codex target or inspect the plugin job result, according to the mechanism used. |
-| Codex → Claude | Relay to Claude in its own UI. A confirmed inactive session can accept the authorized follow-up command above. | Confirm the intended Claude session and the provider result. |
+| Codex → Codex | `send FILE --wake` queues the marker with `codex queue --resume`. | The helper records queue acceptance. The target calls `receive`. |
+| Claude → Claude | `send FILE --wake` hands the sender a reserved marker for the verified local peer. Use Claude's `SendMessage` tool. | Record the tool outcome with `peer-result`. The target calls `receive`. |
+| Claude → Codex | Use `send FILE --wake` from Claude's shell with its existing permissions. | The helper records queue acceptance. The Codex target calls `receive`. |
+| Codex → Claude | With owner opt-in, `send FILE --wake --claude-relay PEER_NAME` uses a restricted Claude CLI turn to reach a loaded local peer. | The helper records the Claude inbox submission. The Claude target calls `receive`. |
 
-The project relay below works with every pairing, including a single provider. Deliver messages manually when the native route is unavailable, the target session cannot be verified, or a reliable acknowledgement is unavailable. Claude's inbox socket requires authenticated access. The starter uses the documented public mechanisms and retains no messaging tokens. See [Codex developer commands](https://learn.chatgpt.com/docs/developer-commands), [Claude cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging), and the [optional Codex plugin](https://github.com/openai/codex-plugin-cc).
+The project relay below works with every pairing. Deliver messages manually when the native route or the exact target is unavailable. Claude's Windows inbox requires authenticated access and its public docs specify authentication without a complete external submission and acknowledgement contract. The starter retains no messaging tokens. See [Codex developer commands](https://learn.chatgpt.com/docs/developer-commands) and [Claude cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging).
 
 When available, use `codex://threads/THREAD_ID` to open a known Desktop thread and `claude --desktop --resume UUID` to open a supported Claude session. Confirm on the intended machine that the session opens and has the expected history. CLI, background and Desktop sessions can have different visibility or live state. Keep native delivery and opening a session as separate operations. See [Codex Desktop commands](https://learn.chatgpt.com/docs/reference/commands), [Claude Desktop](https://code.claude.com/docs/en/desktop), and the [starter troubleshooting guide](https://github.com/krsticlazar/multi-agent-project-starter/blob/main/guides/TROUBLESHOOTING.md).
 
@@ -47,7 +49,7 @@ The UUIDs above illustrate the format. Generate a unique message UUID for each m
 
 ### Optional Python relay
 
-Use Python 3.10 or newer from the project root. `python` can be `python3` or `py -3` on your machine. The helper uses the standard library and has no provider or network dependency.
+Use Python 3.10 or newer from the project root. Use `python3` or `py -3` in commands if that is how your session launches Python. The helper uses the standard library. Automatic CLI delivery also requires the corresponding provider CLI on the invoking session's `PATH`.
 
 ```text
 python tools/session.py init
@@ -71,9 +73,9 @@ The primary checkout contains `.runtime/state.json`. A Git-linked checkout resol
 
 ### Automatic Codex delivery
 
-Use two local Codex sessions in the same project and Codex home. The owner can run `codex app-server daemon start` and verify it with `codex app-server daemon version` to allow a saved session to wake. The helper uses the installed `codex` command and the registered target's working directory. Before dispatch, verify that each target can run `python tools/session.py status` with the session's normal workspace permissions. Receipt requires writing the local runtime. A session provisioned for a read-only readiness check needs workspace access before it can consume the relay.
+Use a local Codex target and invoke the CLI in the same Codex home, whether the sender is Codex or Claude. The owner can run `codex app-server daemon start` and verify it with `codex app-server daemon version` to allow a saved session to wake. The helper uses the installed `codex` command and the registered target's working directory. Before dispatch, verify that each target can run `python tools/session.py status` with the session's normal workspace permissions. Receipt requires writing the local runtime. A session provisioned for a read-only readiness check needs workspace access before it can consume the relay.
 
-1. Start and verify independent Director and Orchestrator sessions, then register their actual Codex thread UUIDs and mark them `IDLE`. Open a saved session in Desktop with `codex://threads/THREAD_ID` where supported.
+1. Start and verify independent Director and Orchestrator sessions, then register their actual provider UUIDs and mark them `IDLE`. Open a saved Codex thread in Desktop with `codex://threads/THREAD_ID` where supported.
 2. Director writes a `TASK` envelope with a new message UUID, the authorized request ID, `task_id` set to `null`, and the two actual session UUIDs. Orchestrator sends a `REPORT` with the same request ID and the actual task ID, or `null` for a request-level report. Use `python tools/session.py send FILE --wake` for either envelope and end the sending turn after checking the result.
 3. The helper first persists the envelope and reserves one submission. It sends a short native wake containing the target and message UUIDs. The destination invokes `python tools/session.py receive RECIPIENT_UUID MESSAGE_UUID` from the project root. This atomically returns and acknowledges the addressed envelope once. A duplicate wake returns `null`. The destination checks authorization in the approved records before work. Director presents the terminal report in the user's language and ends its turn.
 
@@ -81,13 +83,51 @@ Use two local Codex sessions in the same project and Codex home. The owner can r
 
 `NOT_ATTEMPTED` leaves the envelope pending. Resolve the stated reason and reuse the same envelope if an automatic attempt is still appropriate. `SUBMITTING` after an interrupted process and `UNKNOWN` mean that the native result could be ambiguous. Inspect the session history and `.runtime/state.json` before recovery. Keep the original message ID, use `receive` in the confirmed destination when necessary, and check its task record if receipt already happened. A repeat `send --wake` returns the stored attempt after submission, even if the caller uses a new UUID for an identical terminal report. Native queue submission is at most once per project envelope. A native alert or a transport receipt alone is insufficient evidence that an agent finished a business task. [Codex queue reference](https://learn.chatgpt.com/docs/developer-commands)
 
+### Delivery to Claude Code
+
+For Claude → Claude, use two loaded local peers. Give them unique names and match the recipient's actual UUID and working directory with the provider's session roster. Confirm that Claude discovers exactly that peer with `ListAgents` or `/list-agents`. Keep both clients on the same side of the native Windows and WSL boundary. If the recipient is missing or ambiguous, save the envelope with `send FILE` and resolve the route before requesting a wake.
+
+1. Run `python tools/session.py send FILE --wake`. When the result contains `trigger`, call Claude's native `SendMessage` tool once with exactly that text, addressed to the verified peer. Use the canonical message UUID in the result. Subsequent sends return the saved attempt and omit the trigger.
+2. Record the tool outcome with `python tools/session.py peer-result SENDER_UUID MESSAGE_UUID --status STATUS`. Use `ACCEPTED`, `HELD`, or `REFUSED` for explicit native outcomes, and `UNKNOWN` when the result is unclear. An interrupted submission can stay `SUBMITTING`. Check the target before manual recovery. An accepted marker can still await the target's `receive` call.
+3. The target follows the same `receive`, authorization and checkpoint rules as a Codex target. A native peer message can start an idle turn or arrive during a busy turn. Leave a new `TASK` pending while another assignment is active and check the inbox when that assignment ends. A native idle notice signals activity only. Send the terminal `REPORT` as its own envelope using the registered return route.
+
+Keep Claude's inbound and tool permissions under the owner's control. Held messages need the provider's approval path or a separate manual relay. Capabilities differ between Claude Code CLI and the Desktop Code tab. Validate reachability in the actual surfaces before assigning work. For a wake that cannot be submitted or has an uncertain outcome, open the confirmed target and ask it to run `receive RECIPIENT_UUID MESSAGE_UUID` on the saved ID. For a stopped session the owner can use `claude --resume UUID` or open it in Desktop with `claude --desktop --resume UUID`. Use one provider writer. For an authorized one-shot continuation of a confirmed inactive session in a trusted project, `claude -p --resume UUID --output-format json "MARKER"` also works as a recovery command. Inspect the returned `session_id` and local receipt. Programmatic mode skips the workspace trust prompt and uses an API key when one overrides subscription sign-in. Check the active authentication first and retain native tool permissions. See [Claude peer delivery](https://code.claude.com/docs/en/cross-session-messaging), [Claude Code Desktop](https://code.claude.com/docs/en/desktop#coming-from-the-cli), and [subscription use in print mode](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan).
+
+#### Opt-in CLI relay to a loaded Claude peer
+
+Use the native Claude CLI with a first-party subscription and Haiku access in the same local configuration as the target. On Windows the helper requires `claude.exe` on `PATH`. Give the target a unique name such as `myapp-claude-director`. For this command use letters, digits, hyphens or underscores, up to 64 characters, starting with a letter or digit. Confirm that `claude agents --json --all` lists the exact live name, UUID and registered working directory, and that the receiving session can run the helper. Set the sender's role brief to use `python tools/session.py send FILE --wake --claude-relay myapp-claude-director` for that route if the owner has approved the additional subscription turn per wake. For a mixed pairing, set both directions before sending a `TASK` so the return `REPORT` has an available route.
+
+The helper checks the active login without logging its details and refuses authentication or endpoint overrides. It runs a separate Haiku turn with Claude's safe mode, a strict MCP configuration and only the two built-in peer tools. The model gets the verified peer name and the fixed marker. Your target session retains its own permissions and owns the history. A local CLI marker can wake a reachable idle session. Desktop targets must also be visible to the local CLI roster and tools. See [verified surfaces and limits](https://github.com/krsticlazar/multi-agent-project-starter/blob/main/guides/VERIFICATION.md).
+
+`claude_relay.status` of `QUEUED` means a matching native tool call reported an inbox submission. Markers can still be held. `NOT_ATTEMPTED` means preflight stopped before the model turn, for example when the registered target was no longer live. `UNKNOWN` or a remaining `SUBMITTING` means delivery may have happened. Inspect the target and use the original ID for recovery. An automatic attempt through any transport is reserved once per envelope, including after rotation. Use `delivered_at` for relay receipt and the terminal `REPORT` for task completion.
+
 ### Manual relay without Python
 
 Use the native provider's session list and a single designated writer for the local session roster, pause state and pending reports in the primary `.runtime/` directory. Before recording anything in a Git project, verify that `git ls-files -- .runtime` returns no tracked entries. Add `.runtime/` to Git's local ignore rules or create `.runtime/.gitignore` containing `*`, then verify that `git check-ignore .runtime/STATE.md .runtime/handoffs/example.json` lists both paths. Use `.runtime/STATE.md` for the roster and pause and `.runtime/handoffs/` for pending envelopes. Store each envelope under its unique message ID. Check for an existing copy before retrying and record delivery after verifying receipt. Tell the parent when a checkpoint is ready through the next available session turn or user relay. Avoid polling and model-generated acknowledgements.
 
 ## Callbacks and coordinated pause
 
-An explicit `REPORT` captures the business outcome. After an observed provider failure, run `observe` with the structured result or a confirmed process exit code. For example, use `python tools/session.py observe UUID PROVIDER_OUTPUT.jsonl --exit-code 1`. Use output from the registered session only. The helper recognizes Codex CLI `turn.failed`, Codex App Server failed `turn/completed`, Claude Code failed `result` and Claude `StopFailure`. It stores a short deduplicated `BLOCKER` addressed to the registered parent, when one exists. A trusted project-local hook or client can pass the event to `python tools/session.py observe auto -` if its JSON includes one supported native session ID. Call the helper with the actual registered UUID when the output lacks the session ID. No hooks are enabled by default. See [Codex App Server notifications](https://learn.chatgpt.com/docs/app-server), [Codex hooks](https://learn.chatgpt.com/docs/hooks) and [Claude hooks](https://code.claude.com/docs/en/hooks).
+An explicit `REPORT` captures the business outcome. After an observed provider failure, run `observe` with the structured result or a confirmed process exit code. For example, use `python tools/session.py observe UUID PROVIDER_OUTPUT.jsonl --exit-code 1`. Use output from the registered session only. The helper recognizes Codex CLI `turn.failed`, Codex App Server failed `turn/completed`, Claude Code failed `result` and Claude `StopFailure`. It stores a short deduplicated `BLOCKER` addressed to the registered parent, when one exists. A trusted project-local hook or client can pass the event to `python tools/session.py observe auto -` if its JSON includes one supported native session ID. Call the helper with the actual registered UUID when the output lacks the session ID. See [Codex App Server notifications](https://learn.chatgpt.com/docs/app-server), [Codex hooks](https://learn.chatgpt.com/docs/hooks) and [Claude hooks](https://code.claude.com/docs/en/hooks).
+
+For a trusted local Claude project using Python, the owner can merge this optional `StopFailure` hook into `.claude/settings.local.json`. Use the Python executable available to Claude Code and register the role before work. The callback records the failure in local runtime and queues a parent blocker without a follow-up model turn. If it cannot observe the registered session, inspect the provider result and use `observe` manually. See [Claude StopFailure](https://code.claude.com/docs/en/hooks#stopfailure).
+
+```json
+{
+  "hooks": {
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["${CLAUDE_PROJECT_DIR}/tools/session.py", "observe", "auto", "-"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
 
 For an authorized continuation of a registered, inactive Codex session, run this PowerShell example from the project root. The failure path records a local event without starting a follow-up model turn.
 

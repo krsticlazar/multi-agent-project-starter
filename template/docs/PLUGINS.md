@@ -5,7 +5,7 @@ Bootstrap records the user's selections here. The starter works with the native 
 | Name | Provider and scope | Purpose | Status | Setup reference |
 | --- | --- | --- | --- | --- |
 
-Use `Selected`, `Installed`, `Unavailable` or `Removed`. Link to reviewed upstream instructions. Keep credentials and private MCP endpoint details in the provider's approved local configuration.
+Use `Selected`, `Pending`, `Installed`, `Unavailable` or `Removed`. Link to reviewed upstream instructions. Keep credentials and private MCP endpoint details in the provider's approved local configuration.
 
 ## Configuration
 

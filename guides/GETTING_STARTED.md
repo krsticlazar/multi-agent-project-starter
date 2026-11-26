@@ -33,6 +33,8 @@ Tell Director what you want and how you will know it works. Ask it to record def
 
 For local Codex sessions, configure the [automatic TASK and REPORT path](../template/docs/COMMUNICATION.md#automatic-codex-delivery). Start the native daemon for saved idle targets and register the actual Director and Orchestrator thread IDs. On Windows, use the [verified Desktop setup](VERIFICATION.md#live-codex-workflow) with both sessions loaded and able to run the relay helper.
 
+For Claude or mixed sessions, register and verify both roles first, then set the outgoing `TASK` route and return `REPORT` route in their briefs. A loaded Claude session can receive a native peer marker. An external sender can use the opt-in Claude CLI relay if the target is discoverable and you approve the extra subscription turn. [Claude delivery](../template/docs/COMMUNICATION.md#delivery-to-claude-code) · [Mixed-provider handoff](CLAUDE_HANDOFF.md)
+
 ## Upgrade a customized installation
 
 Download the new version into a separate directory. Install into a scratch project, compare it with your working installation, and apply the changes you want. Running the installer again can add missing files, and preserves any existing files it encounters. Keep your current plan, task records, memory, and local runtime. Check the changelog and the session helper help before bringing any changed commands into a running project. [Changelog](../CHANGELOG.md)

@@ -4,11 +4,13 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
+import runpy
 import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 from uuid import uuid4
 
 
@@ -174,7 +176,8 @@ class SessionTests(unittest.TestCase):
         self.assertIsNone(self.execute("receive", director, message_id))
         self.assertEqual(self.execute("inbox", director), [])
 
-        unknown = dict(envelope, request_id="REQ-002", message_id=str(uuid4()))
+        claude = self.register("claude", "orchestrator")
+        unknown = dict(envelope, request_id="REQ-002", message_id=str(uuid4()), sender_session_id=claude)
         result = self.execute("send", "-", "--wake", data=json.dumps(unknown),
                               env={**env, "MAPS_TEST_WAKE_UNKNOWN": "1"})
         self.assertEqual(result["codex_queue"]["status"], "UNKNOWN")
@@ -187,6 +190,91 @@ class SessionTests(unittest.TestCase):
         self.execute("send", "-", "--wake", data=json.dumps(pending_task), env=env, failure="paused")
         self.execute("receive", director, pending_task["message_id"], failure="paused")
         self.assertEqual(len(log.read_text().splitlines()), 2)
+
+    def test_claude_peer_handoff_and_recovery(self):
+        sender = self.register("claude", "director")
+        recipient = self.register("claude", "orchestrator", "--parent", sender)
+        message_id = str(uuid4())
+        envelope = {
+            "message_id": message_id, "request_id": "REQ-001", "task_id": None,
+            "message_type": "TASK", "sender_role": "director", "sender_session_id": sender,
+            "recipient_role": "orchestrator", "recipient_session_id": recipient, "payload": "Private brief.",
+        }
+
+        def send():
+            return self.execute("send", "-", "--wake", data=json.dumps(envelope))
+
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(lambda _: send(), range(2)))
+        triggers = [result["trigger"] for result in results if "trigger" in result]
+        self.assertEqual(len(triggers), 1)
+        self.assertIn(f"receive {recipient} {message_id}", triggers[0])
+        self.assertNotIn(envelope["payload"], triggers[0])
+        self.execute("peer-result", recipient, message_id, "--status", "ACCEPTED", failure="sender")
+        result = self.execute("peer-result", sender, message_id, "--status", "ACCEPTED")
+        self.assertEqual(result["claude_peer"]["status"], "ACCEPTED")
+        self.assertIsNone(result["delivered_at"])
+        self.assertEqual(send(), result)
+        self.execute("receive", recipient, message_id, failure="does not match this Claude session",
+                     env={**os.environ, "CLAUDE_CODE_SESSION_ID": sender})
+        self.assertEqual(self.execute("inbox", recipient), [envelope])
+
+        replacement = self.register("codex", "orchestrator", "--parent", sender)
+        self.execute("update", replacement, "--status", "IDLE")
+        self.execute("rotate", recipient, replacement)
+        self.assertNotIn("codex_queue", send())
+        self.execute("receive", recipient, message_id, failure="retired")
+        self.assertEqual(self.execute("receive", replacement, message_id),
+                         dict(envelope, recipient_session_id=replacement))
+        self.assertIsNone(self.execute("receive", replacement, message_id))
+
+        report = dict(
+            envelope, message_id=str(uuid4()), message_type="REPORT", payload="Completed.",
+            sender_role="orchestrator", sender_session_id=replacement,
+            recipient_role="director", recipient_session_id=sender,
+        )
+        pending = self.execute("send", "-", "--wake", data=json.dumps(report))
+        self.assertEqual(pending["claude_peer"]["status"], "NOT_ATTEMPTED")
+        self.assertEqual(self.execute("inbox", sender), [report])
+
+    def test_cli_claude_relay_verifies_exact_peer_and_native_receipt(self):
+        helper = runpy.run_path(str(SOURCE))
+        relay = helper["claude_relay_wake"]
+        recipient, message_id, native_id = (str(uuid4()) for _ in range(3))
+        name = "starter-director"
+        trigger = f"Starter relay. Run receive {recipient} {message_id}."
+        auth = {"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty", "subscriptionType": "pro"}
+        peer = {"pid": 123, "sessionId": recipient, "cwd": str(self.project), "name": name}
+        send_call = {"type": "tool_use", "name": "SendMessage", "id": "tool-1",
+                     "input": {"to": name, "message": trigger}}
+        receipt = {"success": True, "msg_id": native_id,
+                   "message": f"Wake → {name} (another Claude session on this machine; in its inbox)"}
+
+        def output(value):
+            return subprocess.CompletedProcess([], 0, stdout=json.dumps(value), stderr="")
+
+        def stream(call, tool_id="tool-1"):
+            records = [
+                {"type": "assistant", "message": {"content": [call]}},
+                {"type": "user", "tool_use_result": receipt, "message": {
+                    "content": [{"type": "tool_result", "tool_use_id": tool_id}],
+                }},
+            ]
+            return subprocess.CompletedProcess([], 0, stdout="\n".join(map(json.dumps, records)), stderr="")
+
+        with patch.object(os, "environ", {}), patch.object(shutil, "which", return_value="claude.exe"):
+            with patch.object(subprocess, "run", side_effect=[output(auth), output([peer]), stream(send_call)]) as cli:
+                self.assertEqual(relay(self.project, recipient, name, trigger), {"status": "QUEUED", "queue_id": native_id})
+                self.assertTrue(cli.call_args.args[0][-1].endswith(trigger))
+            duplicates = [peer, dict(peer, sessionId=str(uuid4()))]
+            with patch.object(subprocess, "run", side_effect=[output(auth), output(duplicates)]) as cli:
+                self.assertEqual(relay(self.project, recipient, name, trigger)["status"], "NOT_ATTEMPTED")
+                self.assertEqual(cli.call_count, 2)
+            with patch.object(subprocess, "run", side_effect=[output(auth), output([peer]), stream(send_call, "other")]):
+                self.assertEqual(relay(self.project, recipient, name, trigger), {"status": "UNKNOWN"})
+            with patch.dict(os.environ, ANTHROPIC_API_KEY="test-override"), patch.object(subprocess, "run") as cli:
+                self.assertEqual(relay(self.project, recipient, name, trigger)["status"], "NOT_ATTEMPTED")
+                cli.assert_not_called()
 
     def test_request_level_assignment_correlates_failure(self):
         director = self.register("codex", "director")
