@@ -57,7 +57,7 @@ The project documents carry progress across sessions. The local relay sends `TAS
 | `.codex/`, `.claude/`, `.agents/skills/` | Native configuration and skills |
 | `tools/session.py`, `.runtime/` | Optional helper and local state created during setup |
 
-Human owners commit, push, tag, and publish. Agents can prepare changes and use [isolated worktrees](template/docs/WORKTREES.md) for parallel work. The starter stores no provider credentials and operates no telemetry or relay service. Selected providers and third-party tools process data under their own terms.
+Owners publish checkpoints themselves or authorize an agent to publish a specific checkpoint. Tags and releases stay with the owner. Bootstrap records the project's [GitHub, visibility, publishing and local-only workflow choices](template/docs/GIT_SETUP.md). The starter stores no provider credentials and operates no telemetry or relay service. Selected providers and third-party tools process data under their own terms.
 
 ## Guides
 

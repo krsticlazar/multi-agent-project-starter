@@ -12,6 +12,18 @@ The Planner drafts and revises the plan. The Director presents it to the user an
 
 ## Phases and completion checks
 
+Cover the roadmap through production, recovery and owner acceptance. Give each phase prerequisites, outputs, observable checks and a handoff. Detail the first executable phase and refine later phases from verified outcomes.
+
+## Execution approvals
+
+Record each owner decision separately and link its evidence.
+
+| Decision | Revision and scope | Owner evidence |
+| --- | --- | --- |
+| Plan approval | | |
+| Phase or slice authorization | | |
+| Sensitive operation approval | | |
+
 ## Risks and open decisions
 
 ## Execution checklist

@@ -20,4 +20,10 @@ Open requirements:
 
 User-facing language:
 
+GitHub repository and visibility:
+
+Checkpoint publisher (owner or agent with specific approval):
+
+Workflow record mode, versioned paths and local exclusions:
+
 See [model choices](docs/MODELS.md) and [selected add-ons](docs/PLUGINS.md) for the operating configuration.

@@ -9,6 +9,10 @@ Use linked Git worktrees for concurrent writers when their file scopes can be is
 3. Keep `tasks/INDEX.md`, `MEMORY.md`, and the project runtime in the integration checkout. The worker works from a task snapshot and sends changes or checkpoints back. Changes in separate worktrees are independent until integrated.
 4. Ask the worker for its exact changed paths, including each new file and both sides of a rename. Inspect its status and diff. Include only assigned paths in the transfer. Ask about ambiguous ownership before proceeding.
 
+## Local-only workflow records
+
+Before launching a role from a linked worktree, give it the primary checkout path, assigned scope, and exact paths for the local role briefing and shared records. If the client requires a briefing in its own root, transfer only the authorized files and verify that they are ignored before any staging. If the helper is absent, run `python PRIMARY/tools/session.py --cwd WORKTREE status` with the actual paths to check access. Keep shared state in the primary checkout and verify access on the intended client. For a fresh clone restore the approved local setup from the owner's private copy. [Local-only Git setup](GIT_SETUP.md#opt-into-local-only-workflow-records)
+
 ## Transfer uncommitted files
 
 Prepare a binary-capable patch from the worker's actual working files against its `HEAD`. The temporary Git index starts at that commit and captures the final versions of tracked, deleted, and new non-ignored files. The worker's own staging remains intact. For a rename, the patch carries both paths as a deletion and an addition.
@@ -54,4 +58,4 @@ try {
 
 In the integration checkout, inspect the patch with `git apply --stat <patch>` and review the actual diff. Run `git apply --check <patch>` and, after a successful check with no concurrent writes to those paths, `git apply <patch>`. Use the default apply mode so it leaves the integration index alone. On a failed check, preserve the patch and worker files. Reconcile the conflicting paths with the existing edits, then verify the final diff and run the task checks. Avoid partial application with `--reject`.
 
-Ignored files, submodule contents, and a path's earlier staged version are outside this patch. Record anything needed for handoff separately and transfer it only within the approved scope. Preserve the worker worktree until the integrated changes are verified or safely saved. The user handles commits, pushes, tags, and releases.
+Ignored files, submodule contents, and a path's earlier staged version are outside this patch. Record anything needed for handoff separately and transfer it only within the approved scope. Preserve the worker worktree until the integrated changes are verified or safely saved. Follow the [approved checkpoint procedure](GIT_SETUP.md#publish-an-approved-checkpoint).

@@ -395,9 +395,10 @@ def claude_relay_wake(cwd, recipient_id, name, trigger):
     except (OSError, subprocess.TimeoutExpired, AttributeError, ValueError, KeyError, TypeError):
         return {"status": "NOT_ATTEMPTED", "reason": "Could not verify Claude login and live peer discovery."}
 
+    peer_name = json.dumps(name)
     prompt = (
-        f"Use ListAgents to verify exactly one local Claude session named {name}. If absent or ambiguous, stop. "
-        f"Then use SendMessage exactly once to {name} with just the following single line verbatim. "
+        f"Use ListAgents to verify exactly one local Claude session named {peer_name}. If absent or ambiguous, stop. "
+        f"Then use SendMessage exactly once to {peer_name} with just the following single line verbatim. "
         f"Do not send to any other target or retry. After the tool returns, end the turn.\n{trigger}"
     )
     try:
@@ -646,8 +647,8 @@ def main():
     if args.action == "update" and args.request and args.clear_task:
         parser.error("--request and --clear-task cannot be used together")
     if args.action == "send" and args.claude_relay is not None:
-        if not args.wake or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", args.claude_relay):
-            parser.error("--claude-relay requires --wake and a simple, unique local peer name.")
+        if not args.wake or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9_ -]{0,62}[A-Za-z0-9_-])?", args.claude_relay):
+            parser.error("--claude-relay requires --wake and a unique local peer name with at most 64 characters.")
 
     try:
         data = None

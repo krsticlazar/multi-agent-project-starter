@@ -241,7 +241,9 @@ class SessionTests(unittest.TestCase):
         helper = runpy.run_path(str(SOURCE))
         relay = helper["claude_relay_wake"]
         recipient, message_id, native_id = (str(uuid4()) for _ in range(3))
-        name = "starter-director"
+        name = "Starter Director"
+        self.execute("send", "-", "--wake", "--claude-relay", name, data="{}", failure="envelope")
+        self.execute("send", "-", "--wake", "--claude-relay", "Starter\nDirector", data="{}", failure="peer name")
         trigger = f"Starter relay. Run receive {recipient} {message_id}."
         auth = {"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty", "subscriptionType": "pro"}
         peer = {"pid": 123, "sessionId": recipient, "cwd": str(self.project), "name": name}
@@ -266,6 +268,7 @@ class SessionTests(unittest.TestCase):
             with patch.object(subprocess, "run", side_effect=[output(auth), output([peer]), stream(send_call)]) as cli:
                 self.assertEqual(relay(self.project, recipient, name, trigger), {"status": "QUEUED", "queue_id": native_id})
                 self.assertTrue(cli.call_args.args[0][-1].endswith(trigger))
+                self.assertIn(json.dumps(name), cli.call_args.args[0][-1])
             duplicates = [peer, dict(peer, sessionId=str(uuid4()))]
             with patch.object(subprocess, "run", side_effect=[output(auth), output(duplicates)]) as cli:
                 self.assertEqual(relay(self.project, recipient, name, trigger)["status"], "NOT_ATTEMPTED")

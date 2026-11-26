@@ -4,6 +4,8 @@ The Orchestrator maintains this short continuity record. Bootstrap can record th
 
 ## Current state
 
+Latest verified checkpoint (commit or execution record):
+
 ## Durable facts and decision references
 
 ## Open issues and next obligations

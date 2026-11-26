@@ -7,6 +7,9 @@ Bootstrap records the actual operating profile here. Native adapters inherit the
 - Profile:
 - Approved providers and subscription types:
 - Client or workspace constraints:
+- Desktop visibility by role and project:
+
+Confirm each role independently before session creation. A model approved for development or research leaves the Orchestrator's model and effort open. Obtain separate approval when a model uses paid credits.
 
 | Role | Provider | Confirmed model selector or provider default | Effort or provider default |
 | --- | --- | --- | --- |
