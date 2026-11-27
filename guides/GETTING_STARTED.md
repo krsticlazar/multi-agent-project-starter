@@ -8,6 +8,39 @@ Use compatible local runtimes across the project. Keep native Windows and WSL2 s
 
 ## Download and install
 
+### One command on Windows
+
+Paste the block into PowerShell and set `-Destination` on the last line. It downloads the GitHub source archive to a temporary folder and runs its PowerShell installer. It requires no Git or 7-Zip. This executes the installer from the selected GitHub ref. Use a reviewed full commit hash with `-Ref` to pin the version, or use the manual steps below to inspect the archive before running it.
+
+```powershell
+& {
+    param([string]$Destination, [ValidatePattern('^(main|[a-fA-F0-9]{40})$')][string]$Ref = 'main')
+    $ErrorActionPreference = 'Stop'
+    $temp = (Get-Item -LiteralPath ([IO.Path]::GetTempPath())).FullName
+    $scratch = Join-Path $temp ('multi-agent-starter-' + [guid]::NewGuid())
+    $folder = New-Item -ItemType Directory -Path $scratch
+    try {
+        $archive = Join-Path $scratch 'starter.zip'
+        $source = Join-Path $scratch 'source'
+        Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/krsticlazar/multi-agent-project-starter/archive/$Ref.zip" -OutFile $archive
+        Expand-Archive -LiteralPath $archive -DestinationPath $source
+        $roots = @(Get-ChildItem -LiteralPath $source -Directory -Force)
+        if ($roots.Count -ne 1) { throw 'Unexpected starter archive layout.' }
+        & (Join-Path $roots[0].FullName 'scripts/install.ps1') -Destination $Destination
+    } finally {
+        $resolved = Get-Item -LiteralPath $scratch -Force
+        if ($resolved.FullName -eq $folder.FullName -and $resolved.Parent.FullName -eq $temp -and
+            -not ($resolved.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            Remove-Item -LiteralPath $resolved.FullName -Recurse -Force
+        }
+    }
+} -Destination 'D:\Projects\my-app' -Ref main
+```
+
+Review any `Kept existing` lines and continue to [Bootstrap](#start-bootstrap).
+
+### Manual installation
+
 1. On GitHub, select a published `vX.Y.Z` tag or a specific implementation commit, then choose **Code → Download ZIP**. Branch snapshots can change, so prefer a tag or commit when sharing an installation. Review the extracted installer before running it. [GitHub download instructions](https://docs.github.com/en/repositories/working-with-files/using-files/downloading-source-code-archives)
 2. Open a shell in the extracted directory that contains `scripts/` and `template/`.
 3. Run `./scripts/install.ps1 -Destination 'C:\Projects\my-app'` in PowerShell or `bash scripts/install.sh "$HOME/projects/my-app"` in Bash. Use your actual project path. The final directory can be created if its parent exists.
@@ -29,7 +62,7 @@ You can use Codex for every role, Claude Code for every role, or assign a provid
 
 ## Run one small project task
 
-Tell Director what you want and how you will know it works. Ask it to record deferred ideas in the idea queue. Director can route a clear, scoped request directly and bring in Planner for initial architecture or larger changes. Approve a draft plan through Director before implementation starts. The Orchestrator records work in `tasks/INDEX.md` and reports verified outcomes through Director. Review changes locally and decide when to commit or push.
+Tell Director what you want and how you will know it works. Ask it to record deferred ideas in the idea queue. Director routes authorized work to the Orchestrator and brings in Planner for initial architecture or larger changes. Approve a draft plan through Director before implementation starts. The Orchestrator records work in `tasks/INDEX.md` and reports review and verification separately through Director. Review changes locally and decide when to commit or push.
 
 For local Codex sessions, configure the [automatic TASK and REPORT path](../template/docs/COMMUNICATION.md#automatic-codex-delivery). Start the native daemon for saved idle targets and register the actual Director and Orchestrator thread IDs. On Windows, use the [verified Desktop setup](VERIFICATION.md#live-codex-workflow) with both sessions loaded and able to run the relay helper.
 

@@ -14,6 +14,8 @@ The Planner drafts and revises the plan. The Director presents it to the user an
 
 Cover the roadmap through production, recovery and owner acceptance. Give each phase prerequisites, outputs, observable checks and a handoff. Detail the first executable phase and refine later phases from verified outcomes.
 
+Flag [critical tasks](docs/WORKFLOW.md#review-and-verification) with the reason and required checks. Record any proposed [Supervisor consultation](docs/WORKFLOW.md#events-and-escalation) with its trigger and approval reference before execution authorization.
+
 ## Execution approvals
 
 Record each owner decision separately and link its evidence.

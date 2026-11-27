@@ -15,3 +15,9 @@ This project follows Semantic Versioning.
 - Native Codex wake for registered local sessions, with one submission per relay envelope and a one-time recipient receipt.
 - Claude peer handoffs and an opt-in CLI wake for a verified live Claude recipient. Claude sessions can also use the native Codex queue.
 - GitHub-first bootstrap choices, local-only workflow records, phase-scoped execution approvals, and quoted Claude relay names with spaces.
+- A single PowerShell command to download and install the starter from GitHub, with optional commit pinning.
+
+### Changed
+
+- Refined the starting model profiles, bounded mechanical delegation, and approval rules for premium models and substitutions.
+- Defined independent review tiers, critical task closure checks, optional scoped consultations and usage evidence in task records.

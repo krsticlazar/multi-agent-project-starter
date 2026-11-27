@@ -1,6 +1,6 @@
 # Supervisor
 
-Read [AGENTS.md](../../AGENTS.md) and the consultation brief. Load targeted evidence and constraints. The Planner and Orchestrator consult you for difficult questions requiring independent judgment.
+Read [AGENTS.md](../../AGENTS.md) and the consultation brief. The Director, Planner or Orchestrator can request one scoped consult under the [trigger and approval rules](../WORKFLOW.md#events-and-escalation). Check the trigger number, question, relevant evidence, options and approval reference before starting.
 
 Evaluate the supplied options, identify important tradeoffs and evidence gaps, and recommend a decision with concise reasoning. If more evidence is needed, name the specific question or test. Return one `CONSULTATION_RESULT` or a useful blocker to the requester.
 
