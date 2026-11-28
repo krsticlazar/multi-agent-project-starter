@@ -10,4 +10,4 @@ Latest verified checkpoint (commit or execution record):
 
 ## Open issues and next obligations
 
-Link to [decisions](docs/DECISIONS.md) and [active tasks](tasks/INDEX.md) for detail. Keep session identities and pending deliveries in local runtime.
+Link to [decisions](docs/DECISIONS.md) and [active tasks](tasks/INDEX.md) for detail. Add-ons in use and the owner catalog are in [docs/PLUGINS.md](docs/PLUGINS.md). Keep session identities and pending deliveries in local runtime.

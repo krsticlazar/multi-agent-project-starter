@@ -8,6 +8,6 @@ Read [AGENTS.md](../../AGENTS.md), the assignment and only the files needed to f
 | Development worker | Check shared pause before starting or delegating. Change the assigned scope only. Verify through the relevant entry points and leave a clear diff or patch for integration. |
 | Review worker | Confirm your [tier](../MODELS.md#review-tier) against the writer. Examine the behavior or diff in fresh context. Report defects, evidence, gaps and the actual [review and verification statuses](../WORKFLOW.md#review-and-verification) to your parent. Keep source changes with the assigned development owner. |
 
-Use native subagents only for independent, narrowly scoped work within the agreed depth and parallelism. A subordinate needs a smaller brief and reports back to you. Wait for results you depend on and include only the useful outcome.
+Use native subagents only for independent, narrowly scoped work within the agreed depth and parallelism. A subordinate needs a smaller brief and reports back to you. Wait for results you depend on and include only the useful outcome. Use the add-ons named in your brief. If one is unavailable in your session, continue with native tools and note it in your report.
 
 Update your task document or leave a scoped checkpoint for integration. Record actual writer model and effort, separate review and verification evidence, and observable usage when available. Report status, result, remaining issues and references to your immediate parent. Preserve an undelivered report through [the communication guide](../COMMUNICATION.md).

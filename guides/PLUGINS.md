@@ -2,6 +2,10 @@
 
 Start with the shipped agent definitions and checkpoint skill. Record optional additions in the project's [`docs/PLUGINS.md`](../template/docs/PLUGINS.md) during Bootstrap. Check the installation scope, granted tools, data sharing, and terms before opting in. Keep credentials in the provider's supported credential store and out of project files.
 
+## Bring your own catalog
+
+Keep a personal Markdown catalog of the plugins you use, with short notes on when to use each. Reuse it in each project by pasting it into the `## Owner catalog` section of the installed `docs/PLUGINS.md` before Bootstrap, or by pasting it when Bootstrap asks about add-ons. Bootstrap keeps the text, records what is actually installed, and agents name the relevant entries when they delegate. Keep credentials out of the catalog.
+
 ## Optional catalog
 
 The install paths and licenses below come from the publishers. The starter does not install or verify these components on your account.

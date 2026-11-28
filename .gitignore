@@ -19,3 +19,7 @@ Desktop.ini
 *.log
 .runtime/
 __pycache__/
+
+# Local tool and agent-skill files
+.serena/
+template/docs/agents/
