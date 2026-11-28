@@ -15,7 +15,7 @@ This project follows Semantic Versioning.
 - Native Codex wake for registered local sessions, with one submission per relay envelope and a one-time recipient receipt.
 - Claude peer handoffs and an opt-in CLI wake for a verified live Claude recipient. Claude sessions can also use the native Codex queue.
 - GitHub-first bootstrap choices, local-only workflow records, phase-scoped execution approvals, and quoted Claude relay names with spaces.
-- A single PowerShell command to download and install the starter from GitHub, with optional commit pinning.
+- A one-line PowerShell installation through `scripts/web-install.ps1` that downloads the GitHub archive, checks its ref, and runs the existing installer, with optional commit pinning.
 - An Owner catalog section in `docs/PLUGINS.md` for the owner's own plugin, MCP and skill notes, which agents use when they name add-ons in delegate briefs.
 
 ### Changed

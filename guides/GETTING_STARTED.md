@@ -10,31 +10,18 @@ Use compatible local runtimes across the project. Keep native Windows and WSL2 s
 
 ### One command on Windows
 
-Paste the block into PowerShell and set `-Destination` on the last line. It downloads the GitHub source archive to a temporary folder and runs its PowerShell installer. It requires no Git or 7-Zip. This executes the installer from the selected GitHub ref. Use a reviewed full commit hash with `-Ref` to pin the version, or use the manual steps below to inspect the archive before running it.
+Paste this line into Windows PowerShell 5.1 or PowerShell 7 and set `-Destination` to your project path. A relative path resolves against the current location.
 
 ```powershell
-& {
-    param([string]$Destination, [ValidatePattern('^(main|[a-fA-F0-9]{40})$')][string]$Ref = 'main')
-    $ErrorActionPreference = 'Stop'
-    $temp = (Get-Item -LiteralPath ([IO.Path]::GetTempPath())).FullName
-    $scratch = Join-Path $temp ('multi-agent-starter-' + [guid]::NewGuid())
-    $folder = New-Item -ItemType Directory -Path $scratch
-    try {
-        $archive = Join-Path $scratch 'starter.zip'
-        $source = Join-Path $scratch 'source'
-        Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/krsticlazar/multi-agent-project-starter/archive/$Ref.zip" -OutFile $archive
-        Expand-Archive -LiteralPath $archive -DestinationPath $source
-        $roots = @(Get-ChildItem -LiteralPath $source -Directory -Force)
-        if ($roots.Count -ne 1) { throw 'Unexpected starter archive layout.' }
-        & (Join-Path $roots[0].FullName 'scripts/install.ps1') -Destination $Destination
-    } finally {
-        $resolved = Get-Item -LiteralPath $scratch -Force
-        if ($resolved.FullName -eq $folder.FullName -and $resolved.Parent.FullName -eq $temp -and
-            -not ($resolved.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            Remove-Item -LiteralPath $resolved.FullName -Recurse -Force
-        }
-    }
-} -Destination 'D:\Projects\my-app' -Ref main
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/krsticlazar/multi-agent-project-starter/main/scripts/web-install.ps1))) -Destination 'C:\Projects\my-app'
+```
+
+[`scripts/web-install.ps1`](../scripts/web-install.ps1) downloads the GitHub source archive for the selected ref to a temporary folder, checks that its single root folder matches that ref, runs `scripts/install.ps1` from the archive, and deletes the temporary folder. The installer behaves as in the manual steps. It needs no Git or ZIP tool. The command runs code from GitHub, so it starts the archive's installer in a child process with `-ExecutionPolicy Bypass` for that process only. A machine or user policy set by Group Policy still applies. Review the script first, or use the manual steps to inspect the whole archive before running it.
+
+To pin a reviewed version, set a full commit hash once. It selects both the script and the archive.
+
+```powershell
+$ref = '<full commit hash>'; & ([scriptblock]::Create((irm "https://raw.githubusercontent.com/krsticlazar/multi-agent-project-starter/$ref/scripts/web-install.ps1"))) -Destination 'C:\Projects\my-app' -Ref $ref
 ```
 
 Review any `Kept existing` lines and continue to [Bootstrap](#start-bootstrap).

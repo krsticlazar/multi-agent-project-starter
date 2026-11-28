@@ -8,23 +8,21 @@ Use OpenAI Codex, Claude Code, or both with your existing subscription access. A
 
 ## Quick start
 
-On Windows, use the [one command PowerShell installation](guides/GETTING_STARTED.md#one-command-on-windows) to install directly from GitHub. The manual installation works as follows.
+1. Install the template into an existing directory or a new directory whose parent already exists.
 
-1. Download the source ZIP, extract it, and open a shell in the extracted directory. Pin the download to a commit when you need a reproducible installation. [Download `main` as a ZIP](https://github.com/krsticlazar/multi-agent-project-starter/archive/refs/heads/main.zip) · [GitHub source archive URLs](https://docs.github.com/en/repositories/working-with-files/using-files/downloading-source-code-archives#source-code-archive-urls)
-2. Run the installer for your shell. Choose an existing directory or a new directory whose parent already exists.
-
-   **Windows with PowerShell**
+   **Windows with PowerShell.** Paste one line and set your project path. It needs no Git, ZIP tool or execution policy change. [Pinning and details](guides/GETTING_STARTED.md#one-command-on-windows)
 
    ```powershell
-   .\scripts\install.ps1 -Destination 'C:\Projects\my-app'
+   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/krsticlazar/multi-agent-project-starter/main/scripts/web-install.ps1))) -Destination 'C:\Projects\my-app'
    ```
 
-   **Linux or macOS with Bash**
+   **Linux or macOS with Bash.** [Download `main` as a ZIP](https://github.com/krsticlazar/multi-agent-project-starter/archive/refs/heads/main.zip), extract it, and run the installer from the extracted directory. Pin the download to a commit when you need a reproducible installation. [GitHub source archive URLs](https://docs.github.com/en/repositories/working-with-files/using-files/downloading-source-code-archives#source-code-archive-urls)
 
    ```bash
    bash scripts/install.sh "$HOME/projects/my-app"
    ```
 
+2. Review any `Kept existing` lines in the output.
 3. Open a new Codex or Claude Code session from the destination. Select a model appropriate for setup, such as GPT-6.2 Sol with medium reasoning or Sonnet with medium effort, if available to your account. Send this prompt.
 
    ```text

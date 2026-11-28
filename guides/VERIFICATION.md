@@ -26,9 +26,9 @@ For the first real project check, record each role's actual ID and workspace. Ob
 
 ## Repository checks
 
-Run `python -B -m unittest discover -s tests -v` for archive installation and collision cases, local relay delivery and session rotation, concurrent state updates, synthetic quota callbacks, and uncommitted worktree integration. The suite checks failure paths without spending a subscription quota. It exercises the installers available on the host.
+Run `python -B -m unittest discover -s tests -v` for archive installation and collision cases, the one-line Windows installation with an offline archive, local relay delivery and session rotation, concurrent state updates, synthetic quota callbacks, and uncommitted worktree integration. The suite checks failure paths without spending a subscription quota. It exercises the installers available on the host.
 
-The installed payload and ZIP installation were tested with Windows PowerShell 5.1, PowerShell 7.6.9, and Git Bash 5.3.15 on native Windows. Linux, macOS, and a separate WSL2 user distribution are target environments awaiting local tests. Codex project guidance and the checkpoint skill were detected through the native client. Claude Code validated the project agent and skill definitions locally without sign-in.
+The installed payload, ZIP installation, and the one-line installation from GitHub `main` and a pinned commit were tested with Windows PowerShell 5.1, PowerShell 7.6.9, and Git Bash 5.3.15 on native Windows. Linux, macOS, and a separate WSL2 user distribution are target environments awaiting local tests. Codex project guidance and the checkpoint skill were detected through the native client. Claude Code validated the project agent and skill definitions locally without sign-in.
 
 ## Live Codex workflow
 

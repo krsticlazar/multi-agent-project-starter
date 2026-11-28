@@ -137,6 +137,61 @@ class InstallerTests(unittest.TestCase):
                         run(*shell, str(linked_source / 'scripts' / script_name), str(scratch / 'new target'))
                     self.assertFalse((scratch / 'new target').exists())
 
+    def test_web_install_from_archive(self):
+        shells = [shell for shell, script_name in installers() if script_name == 'install.ps1']
+        if not shells:
+            self.skipTest('PowerShell is not available.')
+        # Stands in for the download so the check runs offline with the documented scriptblock call.
+        command = (
+            "function Invoke-WebRequest([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing) {"
+            " if ($Uri -ne $env:STARTER_URI) { throw \"Unexpected URI $Uri\" }"
+            " Copy-Item -LiteralPath $env:STARTER_ARCHIVE -Destination $OutFile }"
+            " Set-Location -LiteralPath $env:STARTER_WORK;"
+            " & ([scriptblock]::Create((Get-Content -Raw -LiteralPath $env:STARTER_WEB_INSTALL)))"
+            " -Destination $env:STARTER_DESTINATION -Ref $env:STARTER_REF"
+        )
+        with tempfile.TemporaryDirectory(prefix='starter web test ') as temporary:
+            scratch = Path(temporary)
+            archive = scratch / 'archive.zip'
+            root = 'multi-agent-project-starter-main/'
+            with zipfile.ZipFile(archive, 'w') as package:
+                package.write(REPO / 'scripts' / 'install.ps1', root + 'scripts/install.ps1')
+                package.writestr(root + 'template/ASK_ME.md', 'Bootstrap instructions\n')
+                package.writestr(root + 'template/.claude/agents/director.md', 'Claude agent\n')
+            for index, shell in enumerate(shells):
+                with self.subTest(shell=shell[0]):
+                    temp = scratch / f'temp {index}'
+                    temp.mkdir()
+                    env = dict(
+                        os.environ,
+                        TEMP=str(temp),
+                        TMP=str(temp),
+                        STARTER_URI='https://github.com/krsticlazar/multi-agent-project-starter/archive/main.zip',
+                        STARTER_ARCHIVE=str(archive),
+                        STARTER_WORK=str(scratch),
+                        STARTER_WEB_INSTALL=str(REPO / 'scripts' / 'web-install.ps1'),
+                        STARTER_DESTINATION=f'project {index}',
+                        STARTER_REF='main',
+                    )
+                    web = [shell[0], '-NoProfile', '-NonInteractive', '-Command', command]
+                    output = subprocess.run(web, env=env, capture_output=True, text=True, check=True).stdout
+                    target = scratch / f'project {index}'
+                    self.assertIn('Installed ASK_ME.md', output)
+                    self.assertEqual((target / '.claude/agents/director.md').read_text(), 'Claude agent\n')
+                    (target / 'ASK_ME.md').write_text('User edit\n')
+                    output = subprocess.run(web, env=env, capture_output=True, text=True, check=True).stdout
+                    self.assertIn('Kept existing ASK_ME.md', output)
+                    self.assertEqual((target / 'ASK_ME.md').read_text(), 'User edit\n')
+                    self.assertEqual(list(temp.iterdir()), [])
+
+                    # A pinned ref must match the archive root, so this archive is rejected.
+                    pinned = dict(env, STARTER_REF='a' * 40, STARTER_DESTINATION=f'pinned {index}')
+                    pinned['STARTER_URI'] = pinned['STARTER_URI'].replace('main.zip', 'a' * 40 + '.zip')
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        subprocess.run(web, env=pinned, capture_output=True, text=True, check=True)
+                    self.assertFalse((scratch / f'pinned {index}').exists())
+                    self.assertEqual(list(temp.iterdir()), [])
+
     def test_install_public_template(self):
         with tempfile.TemporaryDirectory(prefix='starter payload test ') as temporary:
             for index, (shell, script_name) in enumerate(installers()):
