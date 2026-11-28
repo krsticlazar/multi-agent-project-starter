@@ -10,10 +10,5 @@ Use the [communication guide](docs/COMMUNICATION.md) to register the UUID shown 
 
 ## Agent skills
 
-### Issue tracker
-
-Issues live in GitHub Issues, used through the `gh` CLI. See `docs/agents/issue-tracker.md`.
-
-### Domain docs
-
-Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+- [Issue tracker](docs/agents/issue-tracker.md): use the tracker selected for the project, if any.
+- [Domain docs](docs/agents/domain.md): use the project's existing glossary and decision records.
